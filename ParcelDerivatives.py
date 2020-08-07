@@ -384,6 +384,9 @@ def derived_parcels():
         """Cleanup data that is no longer needed"""
         for feature_class in to_delete:
             arcpy.Delete_management(feature_class)
+    # Run the above functions with logger error catching and formatting
+
+    logger = start_rotating_logging()
 
     try:
 
@@ -423,14 +426,6 @@ def derived_parcels():
         delete()
         logger.info("--- Data Cleanup Completed")
 
-    except ValueError as e:
-        exc_traceback = sys.exc_info()[2]
-        error_text = f'Line: {exc_traceback.tb_lineno} --- {e}'
-        try:
-            logger.error(error_text)
-        except NameError:
-            print(error_text)
-
     except (IOError, KeyError, NameError, IndexError, TypeError, UnboundLocalError):
         tbinfo = traceback.format_exc()
         try:
@@ -443,6 +438,9 @@ def derived_parcels():
             logger.error(arcpy.GetMessages(2))
         except NameError:
             print(arcpy.GetMessages(2))
+
+    except:
+        logger.exception("Picked up an exception:")
 
     finally:
         try:
