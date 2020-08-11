@@ -63,14 +63,6 @@ def start_rotating_logging(log_file=None, max_bytes=100000, backup_count=1, supp
 
 def derived_parcels():
 
-    # Logging
-    script_folder = os.path.dirname(sys.argv[0])
-    script_name_no_ext = os.path.splitext(os.path.basename(sys.argv[0]))[0]
-    log_folder = os.path.join(script_folder, "Log_Files")
-    log_file = os.path.join(log_folder, f"{script_name_no_ext}.log")
-    logger = start_rotating_logging(log_file, 10000, 1, True)
-    logger.info("--- Script Execution Started ---")
-
     # SDE and FGDB paths
     fgdb_services = r"F:\Shares\FGDB_Services"
     connections = os.path.join(fgdb_services, "DatabaseConnections")
@@ -154,18 +146,7 @@ def derived_parcels():
         arcpy.MakeQueryLayer_management(cityworks_view, "Query_PermitsIssued",
                                         "select Shape,ObjectID,CA_OBJECT_ID,CaseNumber,TypeDescription,SubTypeDescription,Status,"
                                         "LOCATION,NAME,ROLE_DESC,TASK_COMPLETE_DATE,BusinessOwner,SUM_PAYMENT_AMOUNT,ASSET_ID_Parcel,"
-                                        "VALUE from CityWorksView.dbo.vw_PLL_IssuedPermits", "ObjectID", "POINT", "3436",
-                                        "PROJCS['NAD_1983_StatePlane_Illinois_West_FIPS_1202_Feet',GEOGCS['GCS_North_American_1983',DATUM['D_North_American_1983',SPHEROID['GRS_1980',6378137.0,298.257222101]],"
-                                        "PRIMEM['Greenwich',0.0],UNIT['Degree',0.0174532925199433]],"
-                                        "PROJECTION['Transverse_Mercator'],"
-                                        "PARAMETER['False_Easting',2296583.333333333],"
-                                        "PARAMETER['False_Northing',0.0],"
-                                        "PARAMETER['Central_Meridian',-90.16666666666667],"
-                                        "PARAMETER['Scale_Factor',0.9999411764705882],"
-                                        "PARAMETER['Latitude_Of_Origin',36.66666666666666],"
-                                        "UNIT['Foot_US',0.3048006096012192]];"
-                                        "-16150900 -46131100 3048.00609601219;-100000 10000;-100000 10000;3.28083333333333E-03;0.001;0.001;IsHighPrecision",
-                                        "DEFINE_SPATIAL_PROPERTIES", "DO_NOT_INCLUDE_M_VALUES", "DO_NOT_INCLUDE_Z_VALUES", "0 0 0 0")
+                                        "VALUE from CityWorksView.dbo.vw_PLL_IssuedPermits", "ObjectID", "POINT", "3436",)
         arcpy.FeatureClassToFeatureClass_conversion("Query_PermitsIssued", parcel_derivatives, "Permits_Issued")
         arcpy.MakeFeatureLayer_management(permits_issued, "Permits_Issued")
         arcpy.MakeFeatureLayer_management(qualified_census_tracts, "CensusTracts")
@@ -384,47 +365,49 @@ def derived_parcels():
         """Cleanup data that is no longer needed"""
         for feature_class in to_delete:
             arcpy.Delete_management(feature_class)
-    # Run the above functions with logger error catching and formatting
 
+    # Run the above functions with logger error catching and formatting
     logger = start_rotating_logging()
 
     try:
 
-        logger.info("--- Permits to Parcels Started ---")
+        logger.info("--- Script Execution Started ---")
+
+        logger.info("--- --- Permits to Parcels Started ---")
         permits_to_parcels()
-        logger.info("--- Permits to Parcels Completed ---")
+        logger.info("--- --- Permits to Parcels Completed ---")
 
-        logger.info("--- Nehemiah Parcels Started ---")
+        logger.info("--- --- Nehemiah Parcels Started ---")
         nehemiah_parcels()
-        logger.info("--- Nehemiah Parcels Completed ---")
+        logger.info("--- --- Nehemiah Parcels Completed ---")
 
-        logger.info("--- TSP Parcels Started ---")
+        logger.info("--- --- TSP Parcels Started ---")
         tsp_parcels()
-        logger.info("--- TSP Parcels Completed ---")
+        logger.info("--- --- TSP Parcels Completed ---")
 
-        logger.info("--- City Parcels Started ---")
+        logger.info("--- --- City Parcels Started ---")
         city_parcels()
-        logger.info("--- City Parcels Completed ---")
+        logger.info("--- --- City Parcels Completed ---")
 
-        logger.info("--- Surplus Parcels Started ---")
+        logger.info("--- --- Surplus Parcels Started ---")
         surplus_parcels()
-        logger.info("--- Surplus Parcels Completed ---")
+        logger.info("--- --- Surplus Parcels Completed ---")
 
-        logger.info("--- Other Subject Parcels Started---")
+        logger.info("--- --- Other Subject Parcels Started---")
         other_subject_parcels()
-        logger.info("--- Other Subject Parcels Complete")
+        logger.info("--- --- Other Subject Parcels Complete")
 
-        logger.info("--- Points of Interest Parcels Started ---")
+        logger.info("--- --- Points of Interest Parcels Started ---")
         poi_parcels()
-        logger.info("--- Points of Interest Parcels Complete ---")
+        logger.info("--- --- Points of Interest Parcels Complete ---")
 
-        logger.info("--- Mowing Parcels Started ---")
+        logger.info("--- --- Mowing Parcels Started ---")
         mowing_parcels()
-        logger.info("--- Mowing Parcels Completed ---")
+        logger.info("--- --- Mowing Parcels Completed ---")
 
-        logger.info("--- Data Cleanup Started")
+        logger.info("--- --- Data Cleanup Started")
         delete()
-        logger.info("--- Data Cleanup Completed")
+        logger.info("--- --- Data Cleanup Completed")
 
     except (IOError, KeyError, NameError, IndexError, TypeError, UnboundLocalError):
         tbinfo = traceback.format_exc()
