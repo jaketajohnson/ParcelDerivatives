@@ -21,47 +21,34 @@ import logging
 import os
 import sys
 import traceback
-from logging.handlers import RotatingFileHandler
 
 
-def start_rotating_logging(log_file=None, max_bytes=100000, backup_count=1, suppress_requests_messages=True):
-    """Creates a logger that outputs to stdout and a log file; outputs start and completion of functions or attribution of functions"""
-
-    formatter = logging.Formatter(fmt="%(asctime)s - %(levelname)s - %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
-
-    # Paths to desired log file
-    script_folder = os.path.dirname(sys.argv[0])
-    script_name = os.path.basename(sys.argv[0])
-    script_name_no_ext = os.path.splitext(script_name)[0]
-    log_folder = os.path.join(script_folder, "Log_Files")
-    if not log_file:
-        log_file = os.path.join(log_folder, f"{script_name_no_ext}.log")
-
-    # Start logging
-    the_logger = logging.getLogger(script_name)
-    the_logger.setLevel(logging.DEBUG)
-
-    # Add the rotating file handler
-    log_handler = RotatingFileHandler(filename=log_file, maxBytes=max_bytes, backupCount=backup_count)
-    log_handler.setLevel(logging.DEBUG)
-    log_handler.setFormatter(formatter)
-    the_logger.addHandler(log_handler)
-
-    # Add the console handler
+def ScriptLogging():
+    """Enables console and log file logging; see test script for comments on functionality"""
+    current_directory = os.getcwd()
+    script_filename = os.path.basename(sys.argv[0])
+    log_filename = os.path.splitext(script_filename)[0]
+    log_file = os.path.join(current_directory, f"{log_filename}.log")
+    if not os.path.exists(log_file):
+        with open(log_file, "w"):
+            pass
+    message_formatting = "%(asctime)s - %(levelname)s - %(message)s"
+    date_formatting = "%Y-%m-%d %H:%M:%S"
+    formatter = logging.Formatter(fmt=message_formatting, datefmt=date_formatting)
+    logging_output = logging.getLogger(f"{log_filename}")
+    logging_output.setLevel(logging.INFO)
     console_handler = logging.StreamHandler()
-    console_handler.setLevel(logging.DEBUG)
+    console_handler.setLevel(logging.INFO)
     console_handler.setFormatter(formatter)
-    the_logger.addHandler(console_handler)
-
-    # Suppress SSL warnings in logs if instructed to
-    if suppress_requests_messages:
-        logging.getLogger("requests").setLevel(logging.WARNING)
-        logging.getLogger("urllib3").setLevel(logging.WARNING)
-
-    return the_logger
+    logging_output.addHandler(console_handler)
+    logging.basicConfig(format=message_formatting, datefmt=date_formatting, filename=log_file, filemode="w", level=logging.INFO)
+    return logging_output
 
 
 def derived_parcels():
+    """Combine parcels to show permits or to show which the City mows"""
+    logger = ScriptLogging()
+    logger.info("Script Execution Start")
 
     # SDE and FGDB paths
     fgdb_services = r"F:\Shares\FGDB_Services"
@@ -84,7 +71,6 @@ def derived_parcels():
     # Parcels inputs and outputs
     parcel_owners = os.path.join(sde, "soa.SANGIS.ptinfo1")
     cadastral = os.path.join(sde, "soa.SANGIS.Cadastral")
-    # subdivision_polygons = (cadastral, "soa.SANGIS.Sub_Poly")
     demography = os.path.join(cityworks_prod, "Demography")
     census_tracts = os.path.join(demography, "Tract2010Insp")
     qualified_census_tracts = os.path.join(demography, "CenTract_Qualified")
@@ -102,7 +88,6 @@ def derived_parcels():
     parcels_cospw = os.path.join(parcel_derivatives, "Parcels_COSPW")
     parcels_oped = os.path.join(parcel_derivatives, "Parcels_OPED")
     parcels_trustee = os.path.join(parcel_derivatives, "Parcels_CountyTrustee")
-    # parcels_commercial = os.path.join(parcel_derivatives, "Parcels_Commercial")
     parcels_poi = os.path.join(parcel_derivatives, "Parcel_POI")
     parcels_surplus = os.path.join(rdl, "SurplusProperty")
 
@@ -113,7 +98,6 @@ def derived_parcels():
     permits_CTQ_EZ_TIF = os.path.join(parcel_derivatives, "Permits_CTQ_EZ_TIF")
     permits_CTQ_EZ_TIF_WARDS = os.path.join(parcel_derivatives, "Permits_CTQ_EZ_TIF_WARDS")
     permits_opportunity_zones = os.path.join(parcel_derivatives, "Permits_OpportunityZones")
-    # permits_CTQ_EZ_TIF_WARDS_TRACTS_SUBS = os.path.join(parcel_derivatives, "Permits_CTQ_EZ_TIF_WARDS_TRACTS_SUBS")
     parcels_permits_issued = os.path.join(parcel_derivatives, "Parcels_PermitsIssued")
 
     # Other subject parcel paths
@@ -141,6 +125,7 @@ def derived_parcels():
 
     def permits_to_parcels():
         """Combine different parcels marked with different types of permits into one feature class"""
+        logger.info("Permits Start")
 
         # Census Tracts
         arcpy.MakeQueryLayer_management(cityworks_view, "Query_PermitsIssued",
@@ -190,38 +175,40 @@ def derived_parcels():
         arcpy.MakeFeatureLayer_management(permits_CTQ, "Permits_CTQ")
         arcpy.MakeFeatureLayer_management(enterprise_zone, "EnterpriseZone")
         arcpy.SpatialJoin_analysis("Permits_CTQ", "EnterpriseZone", permits_CTQ_EZ)
+        logger.info("EZ Complete")
 
         # TIF Districts
         arcpy.MakeFeatureLayer_management(permits_CTQ_EZ, "permits_CTQ_EZ")
         arcpy.MakeFeatureLayer_management(tif_districts, "TIFDistricts")
         arcpy.SpatialJoin_analysis("permits_CTQ_EZ", "TIFDistricts", permits_CTQ_EZ_TIF)
+        logger.info("TIF Complete")
 
         # Administrative Areas Merged
         arcpy.MakeFeatureLayer_management(permits_CTQ_EZ_TIF, "permits_CTQ_EZ_TIF")
         arcpy.MakeFeatureLayer_management(admin_area_merged, "AdministrativeAreaMerged")
         arcpy.SpatialJoin_analysis("permits_CTQ_EZ_TIF", "AdministrativeAreaMerged", permits_CTQ_EZ_TIF_WARDS)
+        logger.info("CTQ Complete")
 
         # Census Tracts
         arcpy.MakeFeatureLayer_management(permits_CTQ_EZ_TIF_WARDS, "permits_CTQ_EZ_TIF_WARDS")
         arcpy.MakeFeatureLayer_management(census_tracts, "CensusTracts")
         arcpy.SpatialJoin_analysis("permits_CTQ_EZ_TIF_WARDS", "CensusTracts", permits_opportunity_zones)
-
-        """# Subdivisions
-        arcpy.MakeFeatureLayer_management(permits_opportunity_zones, "permits_opportunity_zones")
-        arcpy.MakeFeatureLayer_management(subdivision_polygons, "SubdivisionPolygons")
-        arcpy.SpatialJoin_analysis("permits_opportunity_zones", "SubdivisionPolygons", permits_CTQ_EZ_TIF_WARDS_TRACTS_SUBS)"""
+        logger.info("Census Tracts Complete")
 
         # Select parcels by location
         arcpy.FeatureClassToFeatureClass_conversion(parcel_polygons, parcel_derivatives, "ParcelPolygons")
         arcpy.MakeFeatureLayer_management(parcels, "ParcelPolygons")
         selected_parcels = arcpy.SelectLayerByLocation_management("ParcelPolygons", "INTERSECT", permits_issued)
+        logger.info("Permits Issues Complete")
 
         # Combine the permits and parcel polygons
         arcpy.MakeFeatureLayer_management(permits_opportunity_zones, "Permits_OpportunityZones")
         arcpy.SpatialJoin_analysis(selected_parcels, "Permits_OpportunityZones", parcels_permits_issued, "JOIN_ONE_TO_MANY")
+        logger.info("Permits Complete")
 
     def nehemiah_parcels():
         """Extracts parcels with an owner name containing Nehemiah"""
+        logger.info("Nehemiah Start")
 
         arcpy.TableToTable_conversion(parcel_owners, parcel_derivatives, "Parcels_Nehemiah_table",
                                       r"Owner1 LIKE '%NEHEMIAH AFFORDABLE HOUSING II%' Or "
@@ -230,16 +217,20 @@ def derived_parcels():
                                       r"Owner1 LIKE '%NEHEMIAH PSJ LP%'")
         joined_tables = arcpy.AddJoin_management(parcel_polygons, "PIN", parcels_nehemiah_table, "PIN1", "KEEP_COMMON")
         arcpy.FeatureClassToFeatureClass_conversion(joined_tables, parcel_derivatives, "Parcels_Nehemiah")
+        logger.info("Nehemiah Complete")
 
     def tsp_parcels():
         """Extracts parcels with an owner name containing TSP (The Springfield Project)"""
+        logger.info("TSP Start")
 
         arcpy.TableToTable_conversion(parcel_owners, parcel_derivatives, "Parcels_TSP_table", r"Owner1 LIKE '%TSP%'")
         joined_tables = arcpy.AddJoin_management(parcel_polygons, "PIN", parcels_tsp_table, "PIN1", "KEEP_COMMON")
         arcpy.FeatureClassToFeatureClass_conversion(joined_tables, parcel_derivatives, "Parcels_TSP")
+        logger.info("TSP Complete")
 
     def city_parcels():
         """Extracts parcels owned by the City of Springfield then splits into new feature classes by owner organization"""
+        logger.info("City Start")
 
         arcpy.TableToTable_conversion(parcel_owners, parcel_derivatives, "Parcels_City_table", "MTGCode = 26 Or MTGCODE =66 Or MTGCode = 72 Or MTGCode = 73 Or Owner1 = 'SANGAMON COUNTY TRUSTEE'",
                                       fr"tmppin 'tmppin' true false false 8 Double 0 11,First,#,{parcel_owners},-1,-1;"
@@ -252,13 +243,17 @@ def derived_parcels():
         arcpy.Select_analysis(parcels_owner_city, parcels_cospw, "SubjectParcels.MTGCode = 72")
         arcpy.Select_analysis(parcels_owner_city, parcels_oped, "SubjectParcels.MTGCode = 73")
         arcpy.Select_analysis(parcels_owner_city, parcels_trustee, "SubjectParcels.Owner1 = 'SANGAMON COUNTY TRUSTEE'")
+        logger.info("City Complete")
 
     def surplus_parcels():
         """Copies the surplus property data from Bob Lowe's $ drive"""
+        logger.info("Surplus Start")
         arcpy.FeatureClassToFeatureClass_conversion(parcels_surplus, parcel_derivatives, "Parcels_SurplusProperty")
+        logger.info("Surplus Complete")
 
     def other_subject_parcels():
         """Creates parcels for special types of owners like hospitals, schools, and State owned parcels"""
+        logger.info("Other Start")
 
         # Medical
         arcpy.TableToTable_conversion(parcel_owners, parcel_derivatives, "Parcels_Medical_table",
@@ -299,13 +294,17 @@ def derived_parcels():
         arcpy.TableToTable_conversion(parcel_owners, parcel_derivatives, "Parcels_Commercial_table", "soa.SANGIS.ptinfo1.ClassCode IN ('50', '60')")
         joined_tables = arcpy.AddJoin_management(parcel_polygons, "PIN", parcels_commercial_table, "PIN1", "KEEP_COMMON")
         arcpy.FeatureClassToFeatureClass_conversion(joined_tables, parcel_derivatives, "Parcels_Commercial")
+        logger.info("Other Complete")
 
     def poi_parcels():
         """Takes the facility site points layer and grabs the parcels they fall on as a separate layer"""
+        logger.info("POI Start")
         arcpy.SpatialJoin_analysis(parcel_polygons, facility_site_point, parcels_poi, "JOIN_ONE_TO_ONE", "KEEP_COMMON")
+        logger.info("POI Complete")
 
     def mowing_parcels():
         """Combines all the relevant parcels into one feature class showing plots the City mows"""
+        logger.info("Mowing Start")
 
         arcpy.FeatureClassToFeatureClass_conversion(row, parcel_derivatives, "MowZones")
 
@@ -360,76 +359,42 @@ def derived_parcels():
         selected_surplus_property_parcels = arcpy.SelectLayerByAttribute_management(mow_zones, "NEW_SELECTION", "Use_ LIKE '%Vacant Lot%'")
         arcpy.CalculateField_management(selected_surplus_property_parcels, "Description", "'Vacant Lot'")
         arcpy.CalculateFields_management(selected_surplus_property_parcels, "PYTHON3", [["Description", "'Vacant Lot'"], ["MowedBy", "'CONT'"]])
+        logger.info("Mowing Complete")
 
-    def delete():
+    def cleanup():
         """Cleanup data that is no longer needed"""
+        logger.info("Cleanup Start")
         for feature_class in to_delete:
             arcpy.Delete_management(feature_class)
+        logger.info("Cleanup Complete")
 
-    # Run the above functions with logger error catching and formatting
-    logger = start_rotating_logging()
-
+    # Try running the simple function below
     try:
-
-        logger.info("--- Script Execution Started ---")
-
-        logger.info("--- --- Permits to Parcels Started ---")
         permits_to_parcels()
-        logger.info("--- --- Permits to Parcels Completed ---")
-
-        logger.info("--- --- Nehemiah Parcels Started ---")
         nehemiah_parcels()
-        logger.info("--- --- Nehemiah Parcels Completed ---")
-
-        logger.info("--- --- TSP Parcels Started ---")
         tsp_parcels()
-        logger.info("--- --- TSP Parcels Completed ---")
-
-        logger.info("--- --- City Parcels Started ---")
         city_parcels()
-        logger.info("--- --- City Parcels Completed ---")
-
-        logger.info("--- --- Surplus Parcels Started ---")
         surplus_parcels()
-        logger.info("--- --- Surplus Parcels Completed ---")
-
-        logger.info("--- --- Other Subject Parcels Started---")
         other_subject_parcels()
-        logger.info("--- --- Other Subject Parcels Complete")
-
-        logger.info("--- --- Points of Interest Parcels Started ---")
         poi_parcels()
-        logger.info("--- --- Points of Interest Parcels Complete ---")
-
-        logger.info("--- --- Mowing Parcels Started ---")
         mowing_parcels()
-        logger.info("--- --- Mowing Parcels Completed ---")
-
-        logger.info("--- --- Data Cleanup Started")
-        delete()
-        logger.info("--- --- Data Cleanup Completed")
-
-    except (IOError, KeyError, NameError, IndexError, TypeError, UnboundLocalError):
-        tbinfo = traceback.format_exc()
+        cleanup()
+    except (IOError, KeyError, NameError, IndexError, TypeError, UnboundLocalError, ValueError):
+        traceback_info = traceback.format_exc()
         try:
-            logger.error(tbinfo)
+            logger.info(traceback_info)
         except NameError:
-            print(tbinfo)
-
+            print(traceback_info)
     except arcpy.ExecuteError:
         try:
-            tbinfo = traceback.format_exc(2)
-            logger.error(tbinfo)
+            logger.error(arcpy.GetMessages(2))
         except NameError:
             print(arcpy.GetMessages(2))
-
     except:
-        logger.exception("Picked up an exception:")
-
+        logger.exception("Picked up an exception!")
     finally:
         try:
-            logger.info("--- Script Execution Completed ---")
-            logging.shutdown()
+            logger.info("Script Execution Complete")
         except NameError:
             pass
 
