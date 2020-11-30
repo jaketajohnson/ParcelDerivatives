@@ -45,8 +45,20 @@ def ScriptLogging():
     return logging_output
 
 
-def derived_parcels():
+def ParcelDerivatives():
     """Combine parcels to show permits or to show which the City mows"""
+
+    # Logging
+    def logging_lines(name):
+        """Use this wrapper to insert a message before and after the function for logging purposes"""
+        if type(name) == str:
+            def logging_decorator(function):
+                def logging_wrapper():
+                    logger.info(f"{name} Start")
+                    function()
+                    logger.info(f"{name} Complete")
+                return logging_wrapper
+            return logging_decorator
     logger = ScriptLogging()
     logger.info("Script Execution Start")
 
@@ -123,9 +135,9 @@ def derived_parcels():
     # Workspace
     arcpy.env.overwriteOutput = True
 
+    @logging_lines("Permits to Parcels")
     def permits_to_parcels():
         """Combine different parcels marked with different types of permits into one feature class"""
-        logger.info("Permits Start")
 
         # Census Tracts
         arcpy.MakeQueryLayer_management(cityworks_view, "Query_PermitsIssued",
@@ -204,12 +216,10 @@ def derived_parcels():
         # Combine the permits and parcel polygons
         arcpy.MakeFeatureLayer_management(permits_opportunity_zones, "Permits_OpportunityZones")
         arcpy.SpatialJoin_analysis(selected_parcels, "Permits_OpportunityZones", parcels_permits_issued, "JOIN_ONE_TO_MANY")
-        logger.info("Permits Complete")
 
+    @logging_lines("Nehemiah Parcels")
     def nehemiah_parcels():
         """Extracts parcels with an owner name containing Nehemiah"""
-        logger.info("Nehemiah Start")
-
         arcpy.TableToTable_conversion(parcel_owners, parcel_derivatives, "Parcels_Nehemiah_table",
                                       r"Owner1 LIKE '%NEHEMIAH AFFORDABLE HOUSING II%' Or "
                                       r"Owner1 LIKE '%NEHEMIAH AFFORDABLE HOUSING LP%' Or "
@@ -217,21 +227,18 @@ def derived_parcels():
                                       r"Owner1 LIKE '%NEHEMIAH PSJ LP%'")
         joined_tables = arcpy.AddJoin_management(parcel_polygons, "PIN", parcels_nehemiah_table, "PIN1", "KEEP_COMMON")
         arcpy.FeatureClassToFeatureClass_conversion(joined_tables, parcel_derivatives, "Parcels_Nehemiah")
-        logger.info("Nehemiah Complete")
 
+    @logging_lines("TSP Parcels")
     def tsp_parcels():
         """Extracts parcels with an owner name containing TSP (The Springfield Project)"""
-        logger.info("TSP Start")
 
         arcpy.TableToTable_conversion(parcel_owners, parcel_derivatives, "Parcels_TSP_table", r"Owner1 LIKE '%TSP%'")
         joined_tables = arcpy.AddJoin_management(parcel_polygons, "PIN", parcels_tsp_table, "PIN1", "KEEP_COMMON")
         arcpy.FeatureClassToFeatureClass_conversion(joined_tables, parcel_derivatives, "Parcels_TSP")
-        logger.info("TSP Complete")
 
+    @logging_lines("City Parcels")
     def city_parcels():
         """Extracts parcels owned by the City of Springfield then splits into new feature classes by owner organization"""
-        logger.info("City Start")
-
         arcpy.TableToTable_conversion(parcel_owners, parcel_derivatives, "Parcels_City_table", "MTGCode = 26 Or MTGCODE =66 Or MTGCode = 72 Or MTGCode = 73 Or Owner1 = 'SANGAMON COUNTY TRUSTEE'",
                                       fr"tmppin 'tmppin' true false false 8 Double 0 11,First,#,{parcel_owners},-1,-1;"
                                       fr"Owner1 'Owner1' true false false 30 Text 0 0,First,#,{parcel_owners},Owner1,0,30;"
@@ -243,18 +250,15 @@ def derived_parcels():
         arcpy.Select_analysis(parcels_owner_city, parcels_cospw, "SubjectParcels.MTGCode = 72")
         arcpy.Select_analysis(parcels_owner_city, parcels_oped, "SubjectParcels.MTGCode = 73")
         arcpy.Select_analysis(parcels_owner_city, parcels_trustee, "SubjectParcels.Owner1 = 'SANGAMON COUNTY TRUSTEE'")
-        logger.info("City Complete")
 
+    @logging_lines("Surplus Parcels")
     def surplus_parcels():
         """Copies the surplus property data from Bob Lowe's $ drive"""
-        logger.info("Surplus Start")
         arcpy.FeatureClassToFeatureClass_conversion(parcels_surplus, parcel_derivatives, "Parcels_SurplusProperty")
-        logger.info("Surplus Complete")
 
+    @logging_lines("Other Parcels")
     def other_subject_parcels():
         """Creates parcels for special types of owners like hospitals, schools, and State owned parcels"""
-        logger.info("Other Start")
-
         # Medical
         arcpy.TableToTable_conversion(parcel_owners, parcel_derivatives, "Parcels_Medical_table",
                                       "soa.SANGIS.ptinfo1.Owner1 LIKE '%MEMORIAL HEALTH SYSTEM%' Or "
@@ -296,16 +300,14 @@ def derived_parcels():
         arcpy.FeatureClassToFeatureClass_conversion(joined_tables, parcel_derivatives, "Parcels_Commercial")
         logger.info("Other Complete")
 
+    @logging_lines("POI Parcels")
     def poi_parcels():
         """Takes the facility site points layer and grabs the parcels they fall on as a separate layer"""
-        logger.info("POI Start")
         arcpy.SpatialJoin_analysis(parcel_polygons, facility_site_point, parcels_poi, "JOIN_ONE_TO_ONE", "KEEP_COMMON")
-        logger.info("POI Complete")
 
+    @logging_lines("Mowing Parcels")
     def mowing_parcels():
         """Combines all the relevant parcels into one feature class showing plots the City mows"""
-        logger.info("Mowing Start")
-
         arcpy.FeatureClassToFeatureClass_conversion(row, parcel_derivatives, "MowZones")
 
         # Append county trustee parcels
@@ -359,14 +361,12 @@ def derived_parcels():
         selected_surplus_property_parcels = arcpy.SelectLayerByAttribute_management(mow_zones, "NEW_SELECTION", "Use_ LIKE '%Vacant Lot%'")
         arcpy.CalculateField_management(selected_surplus_property_parcels, "Description", "'Vacant Lot'")
         arcpy.CalculateFields_management(selected_surplus_property_parcels, "PYTHON3", [["Description", "'Vacant Lot'"], ["MowedBy", "'CONT'"]])
-        logger.info("Mowing Complete")
 
+    @logging_lines("Cleanup")
     def cleanup():
         """Cleanup data that is no longer needed"""
-        logger.info("Cleanup Start")
         for feature_class in to_delete:
             arcpy.Delete_management(feature_class)
-        logger.info("Cleanup Complete")
 
     # Try running the simple function below
     try:
@@ -400,7 +400,7 @@ def derived_parcels():
 
 
 def main():
-    derived_parcels()
+    ParcelDerivatives()
 
 
 if __name__ == '__main__':
