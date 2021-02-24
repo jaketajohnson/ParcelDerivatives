@@ -67,9 +67,8 @@ def ParcelDerivatives():
     connections = os.path.join(fgdb_services, "DatabaseConnections")
     data = os.path.join(fgdb_services, "Data")
     cityworks_view = os.path.join(connections, "DA@mcwintcwdb.cwprod@CityworksView.sde")
-    cityworks_prod = os.path.join(connections, "da@mcwintcwdb.cwprod@imSPFLD.sde")
+    cityworks_prod = os.path.join(connections, "DA@mcwintcwdb.cwprod@imSPFLD.sde")
     sde = os.path.join(connections, "COSGIS@10.136.40.46@SOA.sde")
-    rdl = r"X:\FG_RDL.gdb"
 
     # Assessment information Paths
     assessment_information = os.path.join(cityworks_prod, "AssessmentInformation")
@@ -101,7 +100,7 @@ def ParcelDerivatives():
     parcels_oped = os.path.join(parcel_derivatives, "Parcels_OPED")
     parcels_trustee = os.path.join(parcel_derivatives, "Parcels_CountyTrustee")
     parcels_poi = os.path.join(parcel_derivatives, "Parcel_POI")
-    parcels_surplus = os.path.join(rdl, "SurplusProperty")
+    points_surplus_property = os.path.join(parcel_derivatives, "Points_SurplusProperty")
 
     # Permits paths
     permits_issued = os.path.join(parcel_derivatives, "Permits_Issued")
@@ -111,6 +110,7 @@ def ParcelDerivatives():
     permits_CTQ_EZ_TIF_WARDS = os.path.join(parcel_derivatives, "Permits_CTQ_EZ_TIF_WARDS")
     permits_opportunity_zones = os.path.join(parcel_derivatives, "Permits_OpportunityZones")
     parcels_permits_issued = os.path.join(parcel_derivatives, "Parcels_PermitsIssued")
+    parcels_surplus_property = os.path.join(parcel_derivatives, "Parcels_SurplusProperty")
 
     # Other subject parcel paths
     parcels_owner_medical_table = os.path.join(parcel_derivatives, "Parcels_Medical_table")
@@ -183,6 +183,18 @@ def ParcelDerivatives():
                                                  f"GlobalID_1 'GlobalID_1' false false false 38 GlobalID 0 0,First,#,{qualified_census_tracts},GlobalID_1,-1,-1;"
                                                  f"VALUE 'VALUE' true true false 255 Text 0 0,First,#,{qualified_census_tracts},VALUE,-1,-1")
 
+        # Surplus Properties
+        arcpy.MakeQueryLayer_management(cityworks_view, "Query_SurplusProperty",
+                                        "select CA_OBJECT_ID,CASE_TYPE,CASE_TYPE_DESC,CASE_NUMBER,CASE_STATUS,LOCATION,STATUS_CODE,CX,CY,PIN,AdminArea,Owner,PropHouseNo,PropDir,PropStreet,PropCity,PropState,"
+                                        "PropZip,CensusTract,Sub_Name,Doc_Number,MAPOrdinance,Name,TIFDISTNAME,Objectid,Shape,Ordinance,Assessee,CertNum,INSP,TaxYear,DocNo,SurUse "
+                                        "from CityWorksView.dbo.vw_PLL_SurplusProperty", "ObjectID", "POINT", "3436",)
+        arcpy.FeatureClassToFeatureClass_conversion("Query_SurplusProperty", parcel_derivatives, "Points_SurplusProperty")
+        arcpy.MakeFeatureLayer_management(points_surplus_property, "Points_SurplusProperty")
+        arcpy.FeatureClassToFeatureClass_conversion(parcel_polygons, parcel_derivatives, "ParcelPolygons")
+        arcpy.MakeFeatureLayer_management(parcels, "ParcelPolygons")
+        selected_surplus_properties = arcpy.SelectLayerByLocation_management(parcels, "INTERSECT", "Points_SurplusProperty")
+        arcpy.FeatureClassToFeatureClass_conversion(selected_surplus_properties, parcel_derivatives, "Parcels_SurplusProperty")
+
         # Enterprise Zone
         arcpy.MakeFeatureLayer_management(permits_CTQ, "Permits_CTQ")
         arcpy.MakeFeatureLayer_management(enterprise_zone, "EnterpriseZone")
@@ -208,10 +220,8 @@ def ParcelDerivatives():
         logger.info("Census Tracts Complete")
 
         # Select parcels by location
-        arcpy.FeatureClassToFeatureClass_conversion(parcel_polygons, parcel_derivatives, "ParcelPolygons")
-        arcpy.MakeFeatureLayer_management(parcels, "ParcelPolygons")
         selected_parcels = arcpy.SelectLayerByLocation_management("ParcelPolygons", "INTERSECT", permits_issued)
-        logger.info("Permits Issues Complete")
+        logger.info("Permits Issued Complete")
 
         # Combine the permits and parcel polygons
         arcpy.MakeFeatureLayer_management(permits_opportunity_zones, "Permits_OpportunityZones")
@@ -250,11 +260,6 @@ def ParcelDerivatives():
         arcpy.Select_analysis(parcels_owner_city, parcels_cospw, "SubjectParcels.MTGCode = 72")
         arcpy.Select_analysis(parcels_owner_city, parcels_oped, "SubjectParcels.MTGCode = 73")
         arcpy.Select_analysis(parcels_owner_city, parcels_trustee, "SubjectParcels.Owner1 = 'SANGAMON COUNTY TRUSTEE'")
-
-    @logging_lines("Surplus Parcels")
-    def surplus_parcels():
-        """Copies the surplus property data from Bob Lowe's $ drive"""
-        arcpy.FeatureClassToFeatureClass_conversion(parcels_surplus, parcel_derivatives, "Parcels_SurplusProperty")
 
     @logging_lines("Other Parcels")
     def other_subject_parcels():
@@ -333,26 +338,8 @@ def ParcelDerivatives():
                                 fr"Lbl 'Lbl' true true false 50 Text 0 0,First,#")
 
         # Append surplus property parcels
-        selected_surplus_property_parcels = arcpy.SelectLayerByLocation_management(parcels_surplus, "HAVE_THEIR_CENTER_IN", city_limits)
-        arcpy.Append_management(selected_surplus_property_parcels, mow_zones, "NO_TEST",
-                                fr"ItemNo 'ItemNo' true true false 2 Short 0 0,First,#;"
-                                fr"Use_ 'Use_' true true false 50 Text 0 0,First,#,{parcels_surplus},Use,0,50;"
-                                fr"Description 'Desc' true true false 50 Text 0 0,First,#;D"
-                                fr"ateAdded 'DateAdded' true true false 8 Date 0 0,First,#;"
-                                fr"Misc 'Misc' true true false 50 Text 0 0,First,#;"
-                                fr"MowedBy 'MowedBy' true true false 50 Text 0 0,First,#;"
-                                fr"GlobalID 'GlobalID' false false true 38 GlobalID 0 0,First,#;"
-                                fr"Date1 'Date1' true true false 8 Date 0 0,First,#;"
-                                fr"Date2 'Date2' true true false 8 Date 0 0,First,#;"
-                                fr"Nbr1 'Nbr1' true true false 8 Double 0 0,First,#;"
-                                fr"Nbr2 'nbr2' true true false 8 Double 0 0,First,#;"
-                                fr"Test1 'Test1' true true false 15 Text 0 0,First,#;"
-                                fr"Test2 'Test2' true true false 25 Text 0 0,First,#;"
-                                fr"FacilityID 'Facility Identifier' true true false 50 Text 0 0,First,#,{parcels_surplus},PIN,0,255;"
-                                fr"NAD83X 'Easting(X)' true true false 8 Double 0 0,First,#;"
-                                fr"NAD83Y 'Northing(Y)' true true false 8 Double 0 0,First,#;"
-                                fr"Status 'Status' true true false 50 Text 0 0,First,#,{parcels_surplus},Status,0,50;"
-                                fr"Lbl 'Lbl' true true false 50 Text 0 0,First,#")
+        selected_surplus_property_parcels = arcpy.SelectLayerByLocation_management(parcels_surplus_property, "HAVE_THEIR_CENTER_IN", city_limits)
+        arcpy.Append_management(selected_surplus_property_parcels, mow_zones, "NO_TEST")
 
         # Calculate fields
         arcpy.CalculateField_management(mow_zones, "MowedBy", "'PW'")
@@ -374,7 +361,6 @@ def ParcelDerivatives():
         nehemiah_parcels()
         tsp_parcels()
         city_parcels()
-        surplus_parcels()
         other_subject_parcels()
         poi_parcels()
         mowing_parcels()
