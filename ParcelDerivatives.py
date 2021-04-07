@@ -192,8 +192,7 @@ def ParcelDerivatives():
         arcpy.MakeFeatureLayer_management(points_surplus_property, "Points_SurplusProperty")
         arcpy.FeatureClassToFeatureClass_conversion(parcel_polygons, parcel_derivatives, "ParcelPolygons")
         arcpy.MakeFeatureLayer_management(parcels, "ParcelPolygons")
-        selected_surplus_properties = arcpy.SelectLayerByLocation_management(parcels, "INTERSECT", "Points_SurplusProperty")
-        arcpy.FeatureClassToFeatureClass_conversion(selected_surplus_properties, parcel_derivatives, "Parcels_SurplusProperty")
+        arcpy.SpatialJoin_analysis("ParcelPolygons", "Points_SurplusProperty", parcels_surplus_property, "JOIN_ONE_TO_ONE", "KEEP_COMMON")
 
         # Enterprise Zone
         arcpy.MakeFeatureLayer_management(permits_CTQ, "Permits_CTQ")
