@@ -105,9 +105,9 @@ def ParcelDerivatives():
     # Permits paths
     permits_issued = os.path.join(parcel_derivatives, "Permits_Issued")
     permits_CTQ = os.path.join(parcel_derivatives, "Permits_CTQ")
-    permits_CTQ_EZ = os.path.join(parcel_derivatives, "Permits_CTQ_EZ")
-    permits_CTQ_EZ_TIF = os.path.join(parcel_derivatives, "Permits_CTQ_EZ_TIF")
-    permits_CTQ_EZ_TIF_WARDS = os.path.join(parcel_derivatives, "Permits_CTQ_EZ_TIF_WARDS")
+    permits_EZ = os.path.join(parcel_derivatives, "Permits_EZ")
+    permits_TIF = os.path.join(parcel_derivatives, "Permit_TIF")
+    permits_Wards = os.path.join(parcel_derivatives, "Permits_Wards")
     permits_opportunity_zones = os.path.join(parcel_derivatives, "Permits_OpportunityZones")
     parcels_permits_issued = os.path.join(parcel_derivatives, "Parcels_PermitsIssued")
     parcels_surplus_property = os.path.join(parcel_derivatives, "Parcels_SurplusProperty")
@@ -128,7 +128,7 @@ def ParcelDerivatives():
     mow_zones = os.path.join(parcel_derivatives, "MowZones")
 
     # List of features to clean up
-    to_delete = [parcels, permits_CTQ, permits_CTQ_EZ, permits_CTQ_EZ_TIF, permits_CTQ_EZ_TIF_WARDS,
+    to_delete = [parcels, permits_CTQ, permits_EZ, permits_TIF, permits_Wards,
                  parcels_nehemiah_table, parcels_tsp_table, parcels_city_table,
                  parcels_owner_city, parcels_owner_medical_table, parcels_owner_schools_table, parcels_owner_state_table, parcels_commercial_table]
 
@@ -136,7 +136,7 @@ def ParcelDerivatives():
     arcpy.env.overwriteOutput = True
 
     @logging_lines("Permits to Parcels")
-    def permits_to_parcels():
+    def PermitsParcels():
         """Combine different parcels marked with different types of permits into one feature class"""
 
         # Census Tracts
@@ -197,25 +197,25 @@ def ParcelDerivatives():
         # Enterprise Zone
         arcpy.MakeFeatureLayer_management(permits_CTQ, "Permits_CTQ")
         arcpy.MakeFeatureLayer_management(enterprise_zone, "EnterpriseZone")
-        arcpy.SpatialJoin_analysis("Permits_CTQ", "EnterpriseZone", permits_CTQ_EZ)
+        arcpy.SpatialJoin_analysis("Permits_CTQ", "EnterpriseZone", permits_EZ)
         logger.info("EZ Complete")
 
         # TIF Districts
-        arcpy.MakeFeatureLayer_management(permits_CTQ_EZ, "permits_CTQ_EZ")
+        arcpy.MakeFeatureLayer_management(permits_EZ, "permits_EZ")
         arcpy.MakeFeatureLayer_management(tif_districts, "TIFDistricts")
-        arcpy.SpatialJoin_analysis("permits_CTQ_EZ", "TIFDistricts", permits_CTQ_EZ_TIF)
+        arcpy.SpatialJoin_analysis("permits_EZ", "TIFDistricts", permits_TIF)
         logger.info("TIF Complete")
 
         # Administrative Areas Merged
-        arcpy.MakeFeatureLayer_management(permits_CTQ_EZ_TIF, "permits_CTQ_EZ_TIF")
+        arcpy.MakeFeatureLayer_management(permits_TIF, "permits_TIF")
         arcpy.MakeFeatureLayer_management(admin_area_merged, "AdministrativeAreaMerged")
-        arcpy.SpatialJoin_analysis("permits_CTQ_EZ_TIF", "AdministrativeAreaMerged", permits_CTQ_EZ_TIF_WARDS)
+        arcpy.SpatialJoin_analysis("permits_TIF", "AdministrativeAreaMerged", permits_Wards)
         logger.info("CTQ Complete")
 
         # Census Tracts
-        arcpy.MakeFeatureLayer_management(permits_CTQ_EZ_TIF_WARDS, "permits_CTQ_EZ_TIF_WARDS")
+        arcpy.MakeFeatureLayer_management(permits_Wards, "permits_Wards")
         arcpy.MakeFeatureLayer_management(census_tracts, "CensusTracts")
-        arcpy.SpatialJoin_analysis("permits_CTQ_EZ_TIF_WARDS", "CensusTracts", permits_opportunity_zones)
+        arcpy.SpatialJoin_analysis("permits_Wards", "CensusTracts", permits_opportunity_zones)
         logger.info("Census Tracts Complete")
 
         # Select parcels by location
@@ -227,7 +227,7 @@ def ParcelDerivatives():
         arcpy.SpatialJoin_analysis(selected_parcels, "Permits_OpportunityZones", parcels_permits_issued, "JOIN_ONE_TO_MANY")
 
     @logging_lines("Nehemiah Parcels")
-    def nehemiah_parcels():
+    def NehemiahParcels():
         """Extracts parcels with an owner name containing Nehemiah"""
         arcpy.TableToTable_conversion(parcel_owners, parcel_derivatives, "Parcels_Nehemiah_table",
                                       r"Owner1 LIKE '%NEHEMIAH AFFORDABLE HOUSING II%' Or "
@@ -238,7 +238,7 @@ def ParcelDerivatives():
         arcpy.FeatureClassToFeatureClass_conversion(joined_tables, parcel_derivatives, "Parcels_Nehemiah")
 
     @logging_lines("TSP Parcels")
-    def tsp_parcels():
+    def TSPParcels():
         """Extracts parcels with an owner name containing TSP (The Springfield Project)"""
 
         arcpy.TableToTable_conversion(parcel_owners, parcel_derivatives, "Parcels_TSP_table", r"Owner1 LIKE '%TSP%'")
@@ -246,7 +246,7 @@ def ParcelDerivatives():
         arcpy.FeatureClassToFeatureClass_conversion(joined_tables, parcel_derivatives, "Parcels_TSP")
 
     @logging_lines("City Parcels")
-    def city_parcels():
+    def CityParcels():
         """Extracts parcels owned by the City of Springfield then splits into new feature classes by owner organization"""
         arcpy.TableToTable_conversion(parcel_owners, parcel_derivatives, "Parcels_City_table", "MTGCode = 26 Or MTGCODE =66 Or MTGCode = 72 Or MTGCode = 73 Or Owner1 = 'SANGAMON COUNTY TRUSTEE'",
                                       fr"tmppin 'tmppin' true false false 8 Double 0 11,First,#,{parcel_owners},-1,-1;"
@@ -261,7 +261,7 @@ def ParcelDerivatives():
         arcpy.Select_analysis(parcels_owner_city, parcels_trustee, "SubjectParcels.Owner1 = 'SANGAMON COUNTY TRUSTEE'")
 
     @logging_lines("Other Parcels")
-    def other_subject_parcels():
+    def OtherParcels():
         """Creates parcels for special types of owners like hospitals, schools, and State owned parcels"""
         # Medical
         arcpy.TableToTable_conversion(parcel_owners, parcel_derivatives, "Parcels_Medical_table",
@@ -305,12 +305,12 @@ def ParcelDerivatives():
         logger.info("Other Complete")
 
     @logging_lines("POI Parcels")
-    def poi_parcels():
+    def POIParcels():
         """Takes the facility site points layer and grabs the parcels they fall on as a separate layer"""
         arcpy.SpatialJoin_analysis(parcel_polygons, facility_site_point, parcels_poi, "JOIN_ONE_TO_ONE", "KEEP_COMMON")
 
     @logging_lines("Mowing Parcels")
-    def mowing_parcels():
+    def MowingParcels():
         """Combines all the relevant parcels into one feature class showing plots the City mows"""
         arcpy.FeatureClassToFeatureClass_conversion(row, parcel_derivatives, "MowZones")
 
@@ -349,21 +349,21 @@ def ParcelDerivatives():
         arcpy.CalculateFields_management(selected_surplus_property_parcels, "PYTHON3", [["Description", "'Vacant Lot'"], ["MowedBy", "'CONT'"]])
 
     @logging_lines("Cleanup")
-    def cleanup():
+    def Cleanup():
         """Cleanup data that is no longer needed"""
         for feature_class in to_delete:
             arcpy.Delete_management(feature_class)
 
     # Try running the simple function below
     try:
-        permits_to_parcels()
-        nehemiah_parcels()
-        tsp_parcels()
-        city_parcels()
-        other_subject_parcels()
-        poi_parcels()
-        mowing_parcels()
-        cleanup()
+        PermitsParcels()
+        NehemiahParcels()
+        TSPParcels()
+        CityParcels()
+        OtherParcels()
+        POIParcels()
+        MowingParcels()
+        Cleanup()
     except (IOError, KeyError, NameError, IndexError, TypeError, UnboundLocalError, ValueError):
         traceback_info = traceback.format_exc()
         try:
