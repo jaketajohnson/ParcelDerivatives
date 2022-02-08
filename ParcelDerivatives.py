@@ -153,7 +153,7 @@ def permits_parcels():
                                     "select CA_OBJECT_ID,CASE_TYPE,CASE_TYPE_DESC,CASE_NUMBER,CASE_STATUS,LOCATION,STATUS_CODE,CX,CY,PIN,AdminArea,Owner,PropHouseNo,PropDir,PropStreet,PropCity,PropState,"
                                     "PropZip,CensusTract,Sub_Name,Doc_Number,MAPOrdinance,Name,TIFDISTNAME,Objectid,Shape,Ordinance,Assessee,CertNum,INSP,TaxYear,DocNo,SurUse "
                                     "from CityWorksView.dbo.vw_PLL_SurplusProperty", "ObjectID", "POINT", "3436",)
-    arcpy.FeatureClassToFeatureClass_conversion("Query_SurplusProperty", parcel_derivatives, "Points_SurplusProperty")
+    arcpy.FeatureClassToFeatureClass_conversion("Query_SurplusProperty", parcel_derivatives, "Points_SurplusProperty", "CASE_STATUS IN ('SUR-ACTIVE', 'SUR-PEND')")
     arcpy.MakeFeatureLayer_management(points_surplus_property, "Points_SurplusProperty")
     arcpy.FeatureClassToFeatureClass_conversion(parcel_polygons, parcel_derivatives, "ParcelPolygons")
     arcpy.MakeFeatureLayer_management(parcels, "ParcelPolygons")
@@ -290,7 +290,7 @@ def mowing_parcels():
     """Combines all the relevant parcels into one feature class showing plots the City mows"""
     arcpy.FeatureClassToFeatureClass_conversion(row, parcel_derivatives, "MowZones")
 
-    # Append county trustee parcels
+    """# Append county trustee parcels
     selected_city_parcels = arcpy.SelectLayerByLocation_management(parcels_trustee, "HAVE_THEIR_CENTER_IN", city_limits)
     arcpy.Append_management(selected_city_parcels, mow_zones, "NO_TEST",
                             fr"ItemNo 'ItemNo' true true false 2 Short 0 0,First,#;"
@@ -314,15 +314,14 @@ def mowing_parcels():
 
     # Append surplus property parcels
     selected_surplus_property_parcels = arcpy.SelectLayerByLocation_management(parcels_surplus_property, "HAVE_THEIR_CENTER_IN", city_limits)
-    arcpy.Append_management(selected_surplus_property_parcels, mow_zones, "NO_TEST")
+    arcpy.Append_management(selected_surplus_property_parcels, mow_zones, "NO_TEST")"""
 
     # Calculate fields
     arcpy.CalculateField_management(mow_zones, "MowedBy", "'PW'")
-    selected_county_trustee_parcels = arcpy.SelectLayerByAttribute_management(mow_zones, "NEW_SELECTION", "Description LIKE '%SANGAMON COUNTY TRUSTEE%'")
+    """selected_county_trustee_parcels = arcpy.SelectLayerByAttribute_management(mow_zones, "NEW_SELECTION", "Description LIKE '%SANGAMON COUNTY TRUSTEE%'")
     arcpy.CalculateFields_management(selected_county_trustee_parcels, "PYTHON3", [["Use_", "'PARCEL'"], ["MowedBy", "'CONT'"]])
     selected_surplus_property_parcels = arcpy.SelectLayerByAttribute_management(mow_zones, "NEW_SELECTION", "Use_ LIKE '%Vacant Lot%'")
-    arcpy.CalculateField_management(selected_surplus_property_parcels, "Description", "'Vacant Lot'")
-    arcpy.CalculateFields_management(selected_surplus_property_parcels, "PYTHON3", [["Description", "'Vacant Lot'"], ["MowedBy", "'CONT'"]])
+    arcpy.CalculateFields_management(selected_surplus_property_parcels, "PYTHON3", [["Description", "'Vacant Lot'"], ["MowedBy", "'CONT'"]])"""
 
 
 @Logging.insert("Cleanup", 1)
